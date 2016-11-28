@@ -1,0 +1,7 @@
+*.bc
+*.so
+*.dtm
+*.o
+*.swp
+*.out
+test

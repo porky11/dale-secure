@@ -1,0 +1,23 @@
+(import safe)
+
+(def-safe-form + ((a int) (b int)))
+(def-safe-form * ((a int) (b int)))
+
+
+
+(using-namespace std.macros
+(def-safe printf (macro intern ((a (p (const char))) rest)
+  (let ((list \ (get-varargs-list mc (- (arg-count mc) 1) rest)))
+    (if (null list)
+      (qq printf (uq a))
+      (let ((safe-list \ (wrap-list mc list (q safe))))
+        (printf "check if parameters match the printf string\n")
+        (qq printf (uq a) (uql list)))))))
+)
+
+(def main (fn extern-c void (void)
+  (def number (var intern int8 3))
+  (safe
+    (printf "test\n")
+    (printf "%i\n" (+ 1 (* 2 (unsafe (cast number int))))))))
+

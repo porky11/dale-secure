@@ -1,0 +1,81 @@
+(module safe)
+
+(import macros)
+(import util)
+
+(using-namespace std.macros
+
+
+(def safe-name (fn (attr cto) extern (p DNode) ((mc (p MContext)) (op-node (p DNode)))
+  (let ((op-name (p (const char)) (@:@ op-node token-str))
+        (safe-name \ (pool-malloc' 255 char)))
+    (sprintf safe-name "_safe-%s" op-name)
+    (mnfv mc safe-name))))
+
+(def def-safe (macro extern (name definition)
+  (def safe-name (var auto \ (safe-name mc name)))
+  (qq def (uq safe-name) (uq definition))))
+
+
+(def def-safe-form (macro extern (name list)
+  (def arg-names (var auto \ (wrap-list mc (wrap-list mc (arg-list-names mc list) (q uq)) (q safe))))
+  (print arg-names)
+  (printf "\n")
+  (qq def-safe (uq name) (macro extern (uq list)
+    (std.macros.print (q (uq name)))
+    (printf " is safe\n")
+    (std.macros.qq (uq name) (uql arg-names))))))
+
+
+(def make-safe (fn (attr cto) extern (p DNode) ((mc (p MContext)) (form (p DNode)))
+  (if (= (@:@ form is-list) 0)
+    form
+    (let ((op-node \ (@:@ form list-node))
+          (arg-nodes \ (@:@ op-node next-node))
+          (valtype \ (type-of mc op-node false))
+          (rtype \ (type-of mc form false))
+          (arg-types \ (@:@ (arg-types mc arg-nodes) list-node))) ;;arg-types not yet defined
+      (print op-node)
+      (printf "=op-node\n")
+      (print arg-nodes)
+      (printf "=arg-nodes\n")
+      (ignore if (null rtype)
+        (printf "rtype null")
+        (print (qq (uq rtype) (uq op-node) (uql arg-types))))
+      (printf "\n")
+      (if (null valtype)
+        (if (and (= 0 (@:@ op-node is-list))
+                 (not (null rtype))
+                 (exists-fn mc (qq (uq rtype) (uq op-node) (uql arg-types))))
+          (let ((safe-node \ (safe-name mc op-node)))
+            (if (null arg-nodes)
+              (qq (uq safe-node))
+              (qq (uq safe-node) (uql arg-nodes))))
+          form)
+        (if (null arg-nodes)
+          (qq _safe-invoke (uq op-node))
+          (qq _safe-invoke (uq op-node) (uql arg-nodes))))))))
+
+(def safe-list (fn (attr cto) extern (p DNode) ((mc (p MContext)) (form (p DNode)))
+  (apply-list mc form (nullptr void)
+    (fn (attr cto) (p DNode) ((mc (p MContext)) (form (p DNode)) (a (p void)))
+      (make-safe mc form)))))
+
+(def safe (macro extern (rest)
+  (printf "expanding safe\n")
+  (def args (var auto \ (get-varargs-list mc (arg-count mc) rest)))
+  (def safe-list (var auto \ (safe-list mc args)))
+  (qq do (uql (@:@ safe-list list-node)))))
+
+(def unsafe (macro extern (rest)
+  (let ((list \ (get-varargs-list mc (arg-count mc) rest)))
+    (qq do (uq list)))))
+
+(ignore def-safe unsafe (macro extern (rest)
+  (printf "unsafe test\n")
+  (let ((list \ (get-varargs-list mc (arg-count mc) rest)))
+    (print list)
+    (printf " is unsafe\n")
+    (qq do (uql list)))))
+
+)
